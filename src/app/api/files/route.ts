@@ -66,8 +66,7 @@
 
 
 import { NextResponse } from 'next/server';
-// @ts-ignore
-import { db } from '../../../lib/db';
+import { prisma as db } from '@/server/db'; // ប្តូរមកទីនេះ
 import bcrypt from 'bcrypt';
 
 export async function POST(req: Request) {
