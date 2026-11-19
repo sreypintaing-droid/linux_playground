@@ -81,13 +81,12 @@ export async function POST(req: Request) {
       where: { email },
     });
 
-    if (!user || !user.password) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
-    }
+    if (!user || !user.passwordHash) {
+  return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+}
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
-
-    if (!passwordMatch) {
+const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
