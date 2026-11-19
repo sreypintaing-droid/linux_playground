@@ -2,7 +2,6 @@ import { z } from "zod";
 import { hashPassword } from "@/server/auth/password";
 import { homeFor, setSessionCookie } from "@/server/auth/session";
 import { audit } from "@/server/audit";
-import { localAuthEnabled } from "@/server/config";
 import { prisma } from "@/server/db";
 import { body, conflict, forbidden, publicRoute } from "@/server/http";
 import { getSettings } from "@/server/services/settings";
@@ -19,15 +18,30 @@ const schema = z.object({
     .regex(/\d/, "Password must contain a number"),
 });
 
-export const POST = publicRoute({ rateLimit: { bucket: "auth-register", limit: 10 } }, async ({ req, ip }) => {
-  if (!localAuthEnabled()) throw forbidden("Registration happens through Firebase sign-in.");
-  const settings = await getSettings();
-  if (!settings.registrationOpen) throw forbidden("Registration is currently closed. Ask your teacher or administrator for an account.");
-  const input = await body(req, schema);
-  const exists = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
-  if (exists) throw conflict("An account with this email already exists.");
-  const { user } = await provisionUser({ email: input.email, name: input.name, passwordHash: await hashPassword(input.password) });
-  await setSessionCookie({ sub: user.id, sv: user.sessionVersion, role: user.role });
-  await audit(user.id, "auth.register", undefined, { provider: "local" }, ip);
-  return { redirect: homeFor(user.role) };
-});
+export const POST = publicRoute(
+  { rateLimit: { bucket: "auth-register", limit: 10 } },
+  async ({ req, ip }) => {
+    const settings = await getSettings();
+    if (!settings.registrationOpen)
+      throw forbidden(
+        "Registration is currently closed. Ask your teacher or administrator for an account.",
+      );
+    const input = await body(req, schema);
+    const exists = await prisma.user.findUnique({
+      where: { email: input.email.toLowerCase() },
+    });
+    if (exists) throw conflict("An account with this email already exists.");
+    const { user } = await provisionUser({
+      email: input.email,
+      name: input.name,
+      passwordHash: await hashPassword(input.password),
+    });
+    await setSessionCookie({
+      sub: user.id,
+      sv: user.sessionVersion,
+      role: user.role,
+    });
+    await audit(user.id, "auth.register", undefined, { provider: "local" }, ip);
+    return { redirect: homeFor(user.role) };
+  },
+);
