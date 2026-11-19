@@ -68,7 +68,13 @@ export function AuthForm({ mode, firebase, demo }: { mode: "login" | "register";
   }
 
   function friendly(e: unknown): string {
-    if (e instanceof ApiClientError) return e.message;
+    if (e instanceof ApiClientError) {
+      if (typeof e.message === "string" && e.message !== "[object Object]") return e.message;
+      const details = (e as { details?: { message?: string }; data?: { error?: { message?: string } | string } });
+      if (typeof details.data?.error === "string") return details.data.error;
+      if (details.data?.error?.message) return details.data.error.message;
+      return JSON.stringify(e);
+    }
     const code = (e as { code?: string })?.code ?? "";
     if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) return "Incorrect email or password.";
     if (code.includes("email-already-in-use")) return "An account with this email already exists.";
@@ -76,7 +82,6 @@ export function AuthForm({ mode, firebase, demo }: { mode: "login" | "register";
     if (code.includes("weak-password")) return "Please choose a stronger password.";
     return "Something went wrong. Please try again.";
   }
-
   async function onSubmit(values: FormValues) {
     setError(null);
     setBusy(true);
